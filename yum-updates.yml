@@ -1,5 +1,5 @@
 - name: Run yum updates
-  hosts: target_hosts
+  hosts: all
   become: yes
 
   tasks:
