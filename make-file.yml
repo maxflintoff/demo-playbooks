@@ -1,8 +1,23 @@
 - name: Make a file
-  hosts: "{{ target_hosts | default('localhost') }}"
+  hosts: target_hosts
 
   tasks:
     - name: Create a file
       copy:
         content: test
         dest: /tmp/test.txt
+    - name: Test write to file
+      lineinfile:
+        line: "Test writing"
+        path: /tmp/test.txt
+    - name: Change perms
+      file:
+        path: /tmp/test.txt
+        owner: root
+        group: root
+        mode: '0775'
+    - name: cleanup
+      file:
+        path: /tmp/test.txt
+        state: absent
+      
