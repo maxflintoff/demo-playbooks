@@ -1,5 +1,5 @@
 - name: Make a file
-  hosts: target_hosts
+  hosts: all
 
   tasks:
     - name: Create a file
