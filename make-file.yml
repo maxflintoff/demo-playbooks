@@ -13,8 +13,8 @@
     - name: Change perms
       file:
         path: /tmp/test.txt
-        owner: root
-        group: root
+        owner: "{{ansible_user_uid}}"
+        group: "{{ansible_user_gid}}"
         mode: '0775'
     - name: cleanup
       file:
