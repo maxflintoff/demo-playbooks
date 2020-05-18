@@ -1,6 +1,9 @@
 - name: Install Terraform
   hosts: all
   tasks:
+    - name: print ansible_facts
+      debug:
+       msg: "{{ansible_facts}}"
     - name: check unzip is installed (RHEL/Centos)
       yum:
         name: unzip
