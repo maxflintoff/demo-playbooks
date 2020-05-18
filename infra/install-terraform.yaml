@@ -28,6 +28,7 @@
         src: /tmp/terraform-cli/terraform
         dest: /usr/local/bin/terraform
         mode: u=rwx,g=rwx,o=rx
+        remote_src: yes
       become: yes
     - name: cleanup tmp directory
       file:
