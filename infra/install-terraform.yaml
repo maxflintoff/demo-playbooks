@@ -1,6 +1,16 @@
 - name: Install Terraform
   hosts: all
   tasks:
+    - name: check unzip is installed (RHEL/Centos)
+      yum:
+        name: unzip
+        state: latest
+      when: ansible_facts['os_family'] == 'Redhat'
+    - name: check unzip is installed (Debian)
+      apt:
+        name: unzip
+        state: latest
+      when: ansible_facts['os_family'] == 'Debian'
     - name: create tmp directory
       file:
         path: /tmp/terraform-cli/
