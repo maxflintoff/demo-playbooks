@@ -1,0 +1,22 @@
+- name: Install Terraform
+  hosts: all
+  tasks:
+    - name: create tmp directory
+      file:
+        path: /tmp/terraform-cli/
+        state: directory
+    - name: Extract terraform Download
+      unarchive:
+        src: https://releases.hashicorp.com/terraform/0.12.25/terraform_0.12.25_{{ansible_facts.os_family|lower}}_amd64.zip
+        dest: /tmp/terraform-cli/
+        remote_src: yes
+    - name: Move to path
+      copy:
+        src: /tmp/terraform-cli/terraform
+        dest: /usr/local/bin/terraform
+        mode: u=rwx,g=rwx,o=rx
+      become: yes
+    - name: cleanup tmp directory
+      file:
+       path: /tmp/terraform-cli/
+       state: absent
