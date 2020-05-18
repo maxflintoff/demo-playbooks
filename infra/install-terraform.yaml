@@ -7,7 +7,7 @@
         state: directory
     - name: Extract terraform Download
       unarchive:
-        src: https://releases.hashicorp.com/terraform/0.12.25/terraform_0.12.25_{{ansible_facts.os_family|lower}}_amd64.zip
+        src: https://releases.hashicorp.com/terraform/0.12.25/terraform_0.12.25_{{ansible_facts.system|lower}}_amd64.zip
         dest: /tmp/terraform-cli/
         remote_src: yes
     - name: Move to path
