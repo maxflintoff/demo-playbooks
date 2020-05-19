@@ -1,3 +1,4 @@
 /security/logs
 /security/results
-/collections/
+/collections/*
+!/collections/requirements.yml
