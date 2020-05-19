@@ -1,0 +1,200 @@
+- name: Create a VM on IBM Cloud
+  hosts: all
+  collections: 
+  - ibmcloud.ibmcollection
+  vars:
+    name_prefix: "{{name_prefix}}"
+    region: eu-gb
+    ssh_public_key: "{{ ssh_public_key }}"
+    zone: eu-gb-1
+    ipv4_cidr_block: '10.242.0.0/18'
+    vsi_profile: bx2-2x8
+    vsi_image: ibm-centos-7-0-64
+    cloud_tags:
+    - create:max
+    - owner:platform-chapter
+    - project:ipo
+
+  tasks:
+    - name: check unzip is installed (RHEL/Centos)
+      yum:
+        name: unzip
+        state: latest
+      when: ansible_facts['os_family'] == "RedHat"
+    - name: check unzip is installed (Debian)
+      apt:
+        name: unzip
+        state: latest
+      when: ansible_facts['os_family'] == "Debian"
+    - name: create terraform plugin dir
+      file:
+        path: "{{ansible_facts.env.HOME}}/.terraform.d/plugins"
+        state: directory
+    - name: check if plugin exists
+      stat:
+        path: "{{ansible_facts.env.HOME}}/.terraform.d/plugins/terraform-provider-ibm_v1.5.2"
+      register: stat_result
+    - name: download terraform provider
+      unarchive: 
+        src: https://github.com/IBM-Cloud/terraform-provider-ibm/releases/download/v1.5.2/{{ansible_facts.system|lower}}_amd64.zip
+        dest: "{{ansible_facts.env.HOME}}/.terraform.d/plugins/"
+        mode: u=rwx,g=rwx,o=rx
+        remote_src: yes
+      when: not stat_result.stat.exists
+    - name: Configure VPC
+      ibm_is_vpc:
+        name: "{{ name_prefix }}-vpc"
+        id: "{{ vpc.id | default(omit) }}"
+        ibmcloud_api_key: "{{ ibmcloud_api_key }}"
+        region: "{{ region }}"
+        tags: "{{ cloud_tags }}"
+      register: vpc_create_output
+    - name: Save VPC as fact
+      set_fact:
+        cacheable: True
+        vpc: "{{ vpc_create_output.resource }}"
+    - name: Configure VPC Subnet
+      ibm_is_subnet:
+        name: "{{ name_prefix }}-subnet"
+        id: "{{ subnet.id | default(omit) }}"
+        vpc: "{{ vpc.id }}"
+        ipv4_cidr_block: "{{ ipv4_cidr_block }}"
+        ibmcloud_api_key: "{{ibmcloud_api_key}}"
+        region: "{{region}}"
+        zone: "{{ zone }}"
+      register: subnet_create_output
+      when: subnet is not defined or subnet['status'] != "available"
+
+    - name: Save VPC Subnet as fact
+      set_fact:
+        cacheable: True
+        subnet: "{{ subnet_create_output.resource }}"
+      when: subnet is not defined or subnet['status'] != "available"
+
+    - name: Load ssh keys
+      ibm_is_ssh_key_info:
+        name: "{{ name_prefix }}-ssh-key"
+        ibmcloud_api_key: "{{ibmcloud_api_key}}"
+        region: "{{region}}"
+      register: existing_ssh_key
+      ignore_errors: True
+
+    - name: debug
+      debug:
+        msg: "{{ existing_ssh_key }}"
+
+    - name: remove key
+      ibm_is_ssh_key:
+        id: "{{existing_ssh_key.resource.id}}"
+        state: absent
+        ibmcloud_api_key: "{{ibmcloud_api_key}}"
+        region: "{{region}}"
+      when: existing_ssh_key['resource'] is defined
+      ignore_errors: True
+
+    - name: Configure SSH Key
+      ibm_is_ssh_key:
+        name: "{{ name_prefix }}-ssh-key"
+        public_key: "{{ ssh_public_key }}"
+        id: "{{ ssh_key.id | default(omit) }}"
+        ibmcloud_api_key: "{{ibmcloud_api_key}}"
+        tags: "{{ cloud_tags }}"
+        region: "{{region}}"
+      register: ssh_key_create_output
+
+    - name: Save SSH Key as fact
+      set_fact:
+        cacheable: True
+        ssh_key: "{{ ssh_key_create_output.resource }}"
+
+    - name: Retrieve image list
+      ibm_is_images_info:
+        ibmcloud_api_key: "{{ibmcloud_api_key}}"
+      register: images_list
+
+    - name: Set VM image name/id dictionary fact
+      set_fact:
+        cacheable: True
+        image_dict: "{{ images_list.resource.images |
+                        items2dict(key_name='name', value_name='id') }}"
+
+    - name: Configure VSI
+      ibm_is_instance:
+        name: "{{ name_prefix }}-vsi"
+        state: available
+        id: "{{ vsi.id | default(omit) }}"
+        vpc: "{{ vpc.id }}"
+        profile: "{{ vsi_profile }}"
+        image: "{{ image_dict[vsi_image] }}"
+        keys:
+          - "{{ ssh_key.id }}"
+        primary_network_interface:
+          - subnet: "{{ subnet.id }}"
+        ibmcloud_api_key: "{{ibmcloud_api_key}}"
+        tags: "{{ cloud_tags }}"
+        region: "{{region}}"
+        zone: "{{ zone }}"
+      register: vsi_create_output
+
+    - name: Save VSI as fact
+      set_fact:
+        cacheable: True
+        vsi: "{{ vsi_create_output.resource }}"
+    - name: Configure Floating IP Address
+      ibm_is_floating_ip:
+        name: "{{ name_prefix }}-fip"
+        id: "{{ fip.id | default(omit) }}"
+        target: "{{ vsi.primary_network_interface[0]['id'] }}"
+        ibmcloud_api_key: "{{ibmcloud_api_key}}"
+        tags: "{{ cloud_tags }}"
+        region: "{{ region }}"
+      register: fip_create_output
+
+    - name: Save Floating IP as fact
+      set_fact:
+        cacheable: True
+        fip: "{{ fip_create_output.resource }}"
+
+    - name: Print Floating IP Address
+      debug:
+        msg: "IP Address: {{ fip.address }}"
+
+    - name: Configure Security Group Rule to open SSH on the VSI
+      ibm_is_security_group_rule:
+        state: available
+        group: "{{ vpc.default_security_group }}"
+        direction: inbound
+        remote: 0.0.0.0/0
+        tcp:
+          - port_max: 22
+            port_min: 22
+        ibmcloud_api_key: "{{ibmcloud_api_key}}"
+        region: "{{region}}"
+
+    - name: Add VSI to Ansible inventory
+      add_host:
+        name: "{{ fip.address }}"
+        ansible_user: root
+        groups: new_vsi
+        ansible_ssh_extra_args: -o StrictHostKeyChecking=no
+
+- name: Check Ansible connection to new DEMO VSI
+  hosts: new_vsi
+  gather_facts: False
+  tasks:
+    - name: Wait for VSI to become reachable over SSH
+      wait_for_connection:
+
+- name: Check Ansible connection to new DEMO VSI
+  hosts: new_vsi
+  tasks:
+    - name: Collect OS information
+      command: cat /etc/os-release
+      register: os_info
+    - name: debug
+      debug:
+        msg: "{{os_info}}"
+
+    - name: Print OS information
+      debug:
+        var: os_info.stdout_lines

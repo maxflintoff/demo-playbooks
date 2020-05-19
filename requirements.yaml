@@ -1,0 +1,4 @@
+collections:
+  - name: ibmcloud.ibmcollection
+    version: 1.5.2
+    source: https://galaxy.ansible.com
