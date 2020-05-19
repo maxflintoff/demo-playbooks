@@ -6,8 +6,8 @@
     vm_flavor: "B1_2X8X100"
     os_key: "CENTOS_7_64"
     datacenter_id: "lon02"
-    tags: 
-      - create:max
+    cloud_tags: 
+      - create:max  
       - owner:platform-chapter
       - project:ipo
     region: eu-gb
@@ -50,7 +50,7 @@
           os: "{{ os_key }}"
           domain: "{{ domain }}"
           datacenter: "{{ datacenter_id }}"
-          tags: "{{ tags | to_json }}"
+          tags: "{{ cloud_tags | to_json }}"
           ibmcloud_api_key: "{{ ibmcloud_api_key }}"
           iaas_classic_username: "{{ iaas_classic_username }}"
           iaas_classic_api_key: "{{ iaas_classic_api_key }}"

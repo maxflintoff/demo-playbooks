@@ -1,0 +1,31 @@
+- name: Create a VM on IBM Cloud
+  hosts: all
+  vars:
+    name_prefix: ansible-demo
+    ssh_public_key: "{{ ssh_public_key }}"
+    vm_flavor: "B1_2X8X100"
+    os_key: "CENTOS_7_64"
+    datacenter_id: "lon02"
+    cloud_tags: 
+      - create:max  
+      - owner:platform-chapter
+      - project:ipo
+    region: eu-gb
+    domain: ansible-test.com
+  tasks:
+    - name: Destroy terraform resources
+      terraform:
+        state: absent
+        project_path: '{{ playbook_dir }}'
+        variables:
+          name_prefix: "{{ name_prefix }}"
+          ssh_key: "{{ ssh_public_key }}"
+          flavor: "{{ vm_flavor }}"
+          os: "{{ os_key }}"
+          domain: "{{ domain }}"
+          datacenter: "{{ datacenter_id }}"
+          tags: "{{ cloud_tags | to_json }}"
+          ibmcloud_api_key: "{{ ibmcloud_api_key }}"
+          iaas_classic_username: "{{ iaas_classic_username }}"
+          iaas_classic_api_key: "{{ iaas_classic_api_key }}"
+          region: "{{ region }}"
