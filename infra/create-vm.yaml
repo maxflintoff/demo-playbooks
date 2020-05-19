@@ -16,6 +16,8 @@
     - project:ipo
 
   tasks:
+    - name: force local install of collection
+      command: ansible-galaxy collection install ibmcloud.ibmcollection,v.1.5.2
     - name: check unzip is installed (RHEL/Centos)
       yum:
         name: unzip
