@@ -1,0 +1,84 @@
+- name: Create a VM on IBM Cloud
+  hosts: all
+  vars:
+    name_prefix: ansible-demo
+    ssh_public_key: "{{ ssh_public_key }}"
+    vm_flavor: "B1_2X8X100"
+    os_key: "CENTOS_7_64"
+    datacenter_id: "lon02"
+    tags: 
+      - create:max
+      - owner:platform-chapter
+      - project:ipo
+    region: eu-gb
+    domain: ansible-test.com
+  tasks:
+    - name: check unzip is installed (RHEL/Centos)
+      yum:
+        name: unzip
+        state: latest
+      when: ansible_facts['os_family'] == "RedHat"
+    - name: check unzip is installed (Debian)
+      apt:
+        name: unzip
+        state: latest
+      when: ansible_facts['os_family'] == "Debian"
+    - name: create terraform plugin dir
+      file:
+        path: "{{ansible_facts.env.HOME}}/.terraform.d/plugins"
+        state: directory
+    - name: check if plugin exists
+      stat:
+        path: "{{ansible_facts.env.HOME}}/.terraform.d/plugins/terraform-provider-ibm_v1.5.2"
+      register: stat_result
+    - name: download terraform provider
+      unarchive: 
+        src: https://github.com/IBM-Cloud/terraform-provider-ibm/releases/download/v1.5.2/{{ansible_facts.system|lower}}_amd64.zip
+        dest: "{{ansible_facts.env.HOME}}/.terraform.d/plugins/"
+        mode: u=rwx,g=rwx,o=rx
+        remote_src: yes
+      when: not stat_result.stat.exists
+    - name: run terraform
+      terraform:
+        project_path: '{{ playbook_dir }}'
+        state: present
+        force_init: True
+        variables:
+          name_prefix: "{{ name_prefix }}"
+          ssh_key: "{{ ssh_public_key }}"
+          flavor: "{{ vm_flavor }}"
+          os: "{{ os_key }}"
+          domain: "{{ domain }}"
+          datacenter: "{{ datacenter_id }}"
+          tags: "{{ tags | to_json }}"
+          ibmcloud_api_key: "{{ ibmcloud_api_key }}"
+          iaas_classic_username: "{{ iaas_classic_username }}"
+          iaas_classic_api_key: "{{ iaas_classic_api_key }}"
+          region: "{{ region }}"
+      register: vm_output
+    - name: add to inventory
+      add_host:
+        name: "{{ vm_output.outputs.vm_details.value.ipv4_address}}"
+        ansible_user: root
+        groups: new_vm
+        ansible_ssh_extra_args: -o StrictHostKeyChecking=no
+
+- name: Check Ansible connection to new VM
+  hosts: new_vm
+  gather_facts: False
+  tasks:
+    - name: Wait for VM to become reachable over SSH
+      wait_for_connection:
+
+- name: Check Ansible connection to new DEMO VSI
+  hosts: new_vm
+  tasks:
+    - name: Collect OS information
+      command: cat /etc/os-release
+      register: os_info
+
+    - name: Print OS information
+      debug:
+        var: os_info.stdout_lines
+
+      
