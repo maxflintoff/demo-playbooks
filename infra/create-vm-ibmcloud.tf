@@ -25,10 +25,6 @@ resource "ibm_compute_ssh_key" "ssh_key" {
     public_key = var.ssh_key
 }
 
-locals {
-    ssh_key_id = local.existing_key ? ibm_compute_ssh_key.ssh_key[0].id : data.ibm_compute_ssh_key.public_key.id
-}
-
 resource "ibm_compute_vm_instance" "vm" {
   hostname                   = "${var.name_prefix}-vm"
   domain = var.domain
